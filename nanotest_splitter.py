@@ -12,7 +12,9 @@ import click
                 type=click.Path(exists=True, dir_okay=False, resolve_path=True))
 @click.option('--clobber', is_flag="True",
               help="Force overwrite without confirmation")
-def nanotest_split(infiles, clobber):
+@click.option('--minimise', is_flag="True",
+			  help="Minimise JSON file size by removing structure")
+def nanotest_split(infiles, clobber, minimise):
     # Set the write-mode based on the clobber flag state
     write_mode = "w" if clobber else "x"
 
@@ -29,7 +31,7 @@ def nanotest_split(infiles, clobber):
             outpath = os.path.join(_dirname, _filename + ".json")
 
             # Write the chunks to file
-            write_json(chunks, outpath, mode=write_mode)
+            write_json(chunks, outpath, mode=write_mode, minimise=minimise)
 
 
 def chunk_file(filename, delim="\t"):
@@ -63,23 +65,26 @@ def chunk_file(filename, delim="\t"):
     return chunks
 
 
-def write_json(chunks, filepath, mode="x"):
+def write_json(chunks, filepath, mode="x", minimise=False):
     outdict = {"point{}".format(i+1): v for i, v in enumerate(chunks)}
 
     try:
         with open(filepath, mode) as outfile:
-            json.dump(outdict, outfile, indent=4, sort_keys=True)
+			if minimise:
+				json.dump(outdict, outfile, sort_keys=True)
+			else:
+				json.dump(outdict, outfile, indent=4, sort_keys=True)
     except FileExistsError:
         click.secho("\n{} already exists!".format(filepath), fg="yellow")
         if input("Do you want to overwrite it? (y/N): ").lower() == "y":
-            write_json(chunks, filepath, mode="w")
+            write_json(chunks, filepath, mode="w", minimise=minimise)
         else:
             resp = input("Rename or cancel? (r/C): ")
             if resp == "r":
                 new_filename = input("New filename (.json): ")
                 directory = os.path.dirname(filepath)
                 new_filepath = os.path.join(directory, new_filename + ".json")
-                write_json(chunks, new_filepath, mode="x")
+                write_json(chunks, new_filepath, mode="x", minimise=minimise)
             else:
                 click.secho("File not saved", fg="red")
 
